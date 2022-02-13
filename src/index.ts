@@ -12,6 +12,16 @@ import vertexShader from './vertex_shader.frag';
 import fragmentShader from './fragment_shader.frag';
 import './index.css';
 
+const PADDING = 10;
+const POINTS_COUNT = 30;
+const MIN_FORCE_DISTANCE = 200;
+const FORCE_COEFFICIENT = 0.5;
+
+type Point = {
+    x: number;
+    y: number;
+};
+
 function init() {
     const canvas = document.getElementById('canvas');
 
@@ -38,14 +48,26 @@ function init() {
     glitchTexture.wrapS = RepeatWrapping;
     glitchTexture.wrapT = RepeatWrapping;
 
-    const cursorPosition = {
+    const cursorPosition: Point = {
         x: 0,
         y: 0,
     };
 
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const pointsPositions: Point[] = [];
+    for (let index = 0; index < POINTS_COUNT; index++) {
+        pointsPositions.push({
+            x: Math.random() * width,
+            y: Math.random() * height,
+        });
+    }
+    const pointsXPositions = new Float32Array(pointsPositions.map((i) => i.x));
+    const pointsYPositions = new Float32Array(pointsPositions.map((i) => i.y));
+
     const geometry = new PlaneGeometry(
-        window.innerWidth - 10,
-        window.innerHeight - 10
+        window.innerWidth - PADDING,
+        window.innerHeight - PADDING
     );
     const material = new ShaderMaterial({
         uniforms: {
@@ -54,6 +76,8 @@ function init() {
             uResolutionY: { value: window.innerHeight },
             uCursorX: { value: cursorPosition.x },
             uCursorY: { value: cursorPosition.y },
+            uPointsXPositions: { value: pointsXPositions },
+            uPointsYPositions: { value: pointsYPositions },
         },
         vertexShader: vertexShader,
         fragmentShader: fragmentShader,
@@ -67,8 +91,8 @@ function init() {
         renderer.setSize(window.innerWidth, window.innerHeight);
         material.uniforms.uResolutionX.value = window.innerWidth;
         material.uniforms.uResolutionY.value = window.innerHeight;
-        geometry.parameters.width = window.innerWidth - 10;
-        geometry.parameters.height = window.innerHeight - 10;
+        geometry.parameters.width = window.innerWidth - PADDING;
+        geometry.parameters.height = window.innerHeight - PADDING;
         camera.left = window.innerWidth / -2;
         camera.right = window.innerWidth / 2;
         camera.top = window.innerHeight / 2;
@@ -90,8 +114,56 @@ function init() {
             material.uniforms.uCursorY.value +
             (cursorPosition.y - material.uniforms.uCursorY.value) * 0.05;
 
-        renderer.render(scene, camera);
+        const width = window.innerWidth;
+        const height = window.innerHeight;
 
+        for (let i = 0; i < POINTS_COUNT; i++) {
+            const currentPoint = pointsPositions[i];
+            const forceVector: Point = { x: 0, y: 0 };
+
+            for (let j = 0; j < POINTS_COUNT; j++) {
+                if (i === j) {
+                    continue;
+                }
+
+                const curForce = getAnotherPointForceVector(
+                    currentPoint,
+                    pointsPositions[j]
+                );
+
+                forceVector.x += curForce.x;
+                forceVector.y += curForce.y;
+            }
+
+            const borderForce = getBorderForceVector(
+                currentPoint,
+                width,
+                height
+            );
+            forceVector.x += borderForce.x;
+            forceVector.y += borderForce.y;
+
+            const cursorForce = getAnotherPointForceVector(
+                currentPoint,
+                cursorPosition
+            );
+            forceVector.x += cursorForce.x * 5;
+            forceVector.y += cursorForce.y * 5;
+
+            currentPoint.x += forceVector.x;
+            currentPoint.y += forceVector.y;
+        }
+        const newPointsXPositions = new Float32Array(
+            pointsPositions.map((i) => i.x)
+        );
+        const newPointsYPositions = new Float32Array(
+            pointsPositions.map((i) => i.y)
+        );
+
+        material.uniforms.uPointsXPositions.value = newPointsXPositions;
+        material.uniforms.uPointsYPositions.value = newPointsYPositions;
+
+        renderer.render(scene, camera);
         window.requestAnimationFrame(render);
     }
 
@@ -99,12 +171,12 @@ function init() {
 
     function mousemove(event: MouseEvent) {
         cursorPosition.x = event.clientX;
-        cursorPosition.y = event.clientY;
+        cursorPosition.y = window.innerHeight - event.clientY;
     }
 
     function touchmove(event: TouchEvent) {
         cursorPosition.x = event.touches[0].clientX;
-        cursorPosition.y = event.touches[0].clientY;
+        cursorPosition.y = window.innerHeight - event.touches[0].clientY;
     }
 
     window.addEventListener('mousemove', mousemove);
@@ -113,3 +185,50 @@ function init() {
 }
 
 init();
+
+function getDistance(a: Point, b: Point): number {
+    return Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
+}
+
+function getAnotherPointForceVector(a: Point, b: Point): Point {
+    const distance = getDistance(a, b);
+
+    if (distance > MIN_FORCE_DISTANCE) {
+        return { x: 0, y: 0 };
+    }
+
+    if (distance === 0) {
+        return { x: 1, y: 1 };
+    }
+
+    return {
+        x: ((a.x - b.x) / distance) * FORCE_COEFFICIENT,
+        y: ((a.y - b.y) / distance) * FORCE_COEFFICIENT,
+    };
+}
+
+function getBorderForceVector(a: Point, width: number, height: number): Point {
+    const top: Point = getAnotherPointForceVector(a, {
+        x: a.x,
+        y: 0,
+    });
+    const right: Point = getAnotherPointForceVector(a, {
+        x: width,
+        y: a.y,
+    });
+
+    const bottom: Point = getAnotherPointForceVector(a, {
+        x: a.x,
+        y: height,
+    });
+
+    const left: Point = getAnotherPointForceVector(a, {
+        x: 0,
+        y: a.y,
+    });
+
+    return {
+        x: (top.x + right.x + bottom.x + left.x) * 5,
+        y: (top.y + right.y + bottom.y + left.y) * 5,
+    };
+}

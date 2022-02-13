@@ -4,8 +4,9 @@ uniform float uResolutionX;
 uniform float uResolutionY;
 uniform float uCursorX;
 uniform float uCursorY;
+uniform float[30] uPointsXPositions;
+uniform float[30] uPointsYPositions;
 varying vec2 vTextureCoord;
-
 
 float mod289(float x){return x - floor(x * (1.0 / 289.0)) * 289.0;}
 vec4 mod289(vec4 x){return x - floor(x * (1.0 / 289.0)) * 289.0;}
@@ -38,25 +39,27 @@ void main(void) {
     float d = uResolutionY / uResolutionX;
 
     vec2 normalizedUv = vec2(uv.x / d, uv.y);
-    vec2 cursorPosition = vec2(uCursorX / uResolutionX / d, 1.0 - uCursorY / uResolutionY);
+    vec2 cursorPosition = vec2(uCursorX / uResolutionX / d, uCursorY / uResolutionY);
     vec4 currentPointColor = vec4(0.0);
 
     float intensity = 1.0 / (10.0 * distance(normalizedUv, cursorPosition));
-
-    vec2 light2 = vec2(sin(uTime / 100.0 + 3.0) *- 2.0, cos(uTime / 100.0 + 7.0) * 1.0) * 0.2 + vec2(0.5, 0.5);
-    vec4 lightColor2 = vec4(0.3, 1.0, 0.3, 0.0);
-    float cloudIntensity2 = (1.0 / (20.0 * distance(normalizedUv, light2)));
 
     float radius = sin(uTime / 10.0) * 0.5;
     float distanceToCenter = distance(normalizedUv, cursorPosition);
     float distanceToCircle = abs(distanceToCenter - radius);
     float ringIntensity = 1.0 / (distanceToCircle * 100.0);
 
+    currentPointColor += vec4(1.0, 0.2, 0.2, 0.0) * intensity + ringIntensity * vec4(0.2, 0.2, 1.0, 0.0);
 
-    float blue = sin(uTime / 100.0) * 0.2;
-    float green = sin(uTime / 40.0 + 0.6) * 0.2;
-    float red = sin(uTime / 10.0 + 1.0) * 0.2;
-    vec4 noiseColor = vec4(red, green, blue, 0.0) * noise(vec3(normalizedUv.x * 5.0, normalizedUv.y* 5.0, uTime / 100.0)) * 2.0;
+    for(int i = 0; i < 30; ++i) {
+        vec2 pointPosition = vec2(
+            (uPointsXPositions[i] / uResolutionX) / d,
+            uPointsYPositions[i] / uResolutionY
+        );
 
-    gl_FragColor = currentPointColor + vec4(1.0, 0.2, 0.2, 0.0) * intensity + lightColor2 * cloudIntensity2 + ringIntensity * vec4(0.2, 0.2, 1.0, 0.0) + noiseColor;
+        float distanceToPoint = distance(pointPosition, normalizedUv);
+        currentPointColor += vec4(0.1, 0.5, 0.1, 0.0) * (1.0 / (distanceToPoint * 200.0));
+    }
+
+    gl_FragColor = currentPointColor;
 }
