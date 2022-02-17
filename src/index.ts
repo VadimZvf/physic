@@ -53,8 +53,8 @@ function init() {
         y: 0,
     };
 
-    const width = window.innerWidth;
-    const height = window.innerHeight;
+    let width = window.innerWidth;
+    let height = window.innerHeight;
     const pointsPositions: Point[] = [];
     for (let index = 0; index < POINTS_COUNT; index++) {
         pointsPositions.push({
@@ -88,15 +88,17 @@ function init() {
     screen.position.z = 0;
 
     function resize() {
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        material.uniforms.uResolutionX.value = window.innerWidth;
-        material.uniforms.uResolutionY.value = window.innerHeight;
-        geometry.parameters.width = window.innerWidth - PADDING;
-        geometry.parameters.height = window.innerHeight - PADDING;
-        camera.left = window.innerWidth / -2;
-        camera.right = window.innerWidth / 2;
-        camera.top = window.innerHeight / 2;
-        camera.bottom = window.innerHeight / -2;
+        width = window.innerWidth;
+        height = window.innerHeight;
+        renderer.setSize(width, height);
+        material.uniforms.uResolutionX.value = width;
+        material.uniforms.uResolutionY.value = height;
+        geometry.parameters.width = width - PADDING;
+        geometry.parameters.height = height - PADDING;
+        camera.left = width / -2;
+        camera.right = width / 2;
+        camera.top = height / 2;
+        camera.bottom = height / -2;
     }
 
     resize();
@@ -105,17 +107,14 @@ function init() {
 
     scene.add(screen);
 
-    function render() {
-        material.uniforms.uTime.value += 1;
+    function render(time: number) {
+        material.uniforms.uTime.value = time / 20;
         material.uniforms.uCursorX.value =
             material.uniforms.uCursorX.value +
             (cursorPosition.x - material.uniforms.uCursorX.value) * 0.05;
         material.uniforms.uCursorY.value =
             material.uniforms.uCursorY.value +
             (cursorPosition.y - material.uniforms.uCursorY.value) * 0.05;
-
-        const width = window.innerWidth;
-        const height = window.innerHeight;
 
         for (let i = 0; i < POINTS_COUNT; i++) {
             const currentPoint = pointsPositions[i];
@@ -126,7 +125,7 @@ function init() {
                     continue;
                 }
 
-                const curForce = getAnotherPointForceVector(
+                const curForce = getAttractPointForceVector(
                     currentPoint,
                     pointsPositions[j]
                 );
@@ -143,7 +142,7 @@ function init() {
             forceVector.x += borderForce.x;
             forceVector.y += borderForce.y;
 
-            const cursorForce = getAnotherPointForceVector(
+            const cursorForce = getAttractPointForceVector(
                 currentPoint,
                 cursorPosition
             );
@@ -153,15 +152,15 @@ function init() {
             currentPoint.x += forceVector.x;
             currentPoint.y += forceVector.y;
         }
-        const newPointsXPositions = new Float32Array(
-            pointsPositions.map((i) => i.x)
-        );
-        const newPointsYPositions = new Float32Array(
-            pointsPositions.map((i) => i.y)
-        );
 
-        material.uniforms.uPointsXPositions.value = newPointsXPositions;
-        material.uniforms.uPointsYPositions.value = newPointsYPositions;
+        for (let index = 0; index < pointsPositions.length; index++) {
+            const element = pointsPositions[index];
+            pointsXPositions[index] = element.x;
+            pointsYPositions[index] = element.y;
+        }
+
+        material.uniforms.uPointsXPositions.value = pointsXPositions;
+        material.uniforms.uPointsYPositions.value = pointsYPositions;
 
         renderer.render(scene, camera);
         window.requestAnimationFrame(render);
@@ -190,7 +189,20 @@ function getDistance(a: Point, b: Point): number {
     return Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
 }
 
-function getAnotherPointForceVector(a: Point, b: Point): Point {
+function getAttractPointForceVector(a: Point, b: Point): Point {
+    const distance = getDistance(a, b);
+
+    if (distance >= MIN_FORCE_DISTANCE) {
+        return { x: 0, y: 0 };
+    }
+
+    return {
+        x: ((b.x - a.x) / distance) * FORCE_COEFFICIENT,
+        y: ((b.y - a.y) / distance) * FORCE_COEFFICIENT,
+    };
+}
+
+function getPushPointForceVector(a: Point, b: Point): Point {
     const distance = getDistance(a, b);
 
     if (distance > MIN_FORCE_DISTANCE) {
@@ -208,21 +220,21 @@ function getAnotherPointForceVector(a: Point, b: Point): Point {
 }
 
 function getBorderForceVector(a: Point, width: number, height: number): Point {
-    const top: Point = getAnotherPointForceVector(a, {
+    const top: Point = getPushPointForceVector(a, {
         x: a.x,
         y: 0,
     });
-    const right: Point = getAnotherPointForceVector(a, {
+    const right: Point = getPushPointForceVector(a, {
         x: width,
         y: a.y,
     });
 
-    const bottom: Point = getAnotherPointForceVector(a, {
+    const bottom: Point = getPushPointForceVector(a, {
         x: a.x,
         y: height,
     });
 
-    const left: Point = getAnotherPointForceVector(a, {
+    const left: Point = getPushPointForceVector(a, {
         x: 0,
         y: a.y,
     });
