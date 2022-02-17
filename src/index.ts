@@ -16,6 +16,8 @@ const PADDING = 10;
 const POINTS_COUNT = 30;
 const MIN_FORCE_DISTANCE = 200;
 const FORCE_COEFFICIENT = 0.5;
+const MIN_NUCLEAR_FORCE_DISTANCE = 10;
+const NUCLEAR_COEFFICIENT = 10;
 
 type Point = {
     x: number;
@@ -132,6 +134,14 @@ function init() {
 
                 forceVector.x += curForce.x;
                 forceVector.y += curForce.y;
+
+                const nuclearForce = getNuclearPointForceVector(
+                    currentPoint,
+                    pointsPositions[j]
+                );
+
+                forceVector.x += nuclearForce.x;
+                forceVector.y += nuclearForce.y;
             }
 
             const borderForce = getBorderForceVector(
@@ -216,6 +226,23 @@ function getPushPointForceVector(a: Point, b: Point): Point {
     return {
         x: ((a.x - b.x) / distance) * FORCE_COEFFICIENT,
         y: ((a.y - b.y) / distance) * FORCE_COEFFICIENT,
+    };
+}
+
+function getNuclearPointForceVector(a: Point, b: Point): Point {
+    const distance = getDistance(a, b);
+
+    if (distance > MIN_NUCLEAR_FORCE_DISTANCE) {
+        return { x: 0, y: 0 };
+    }
+
+    if (distance === 0) {
+        return { x: 1, y: 1 };
+    }
+
+    return {
+        x: ((a.x - b.x) / distance) * NUCLEAR_COEFFICIENT,
+        y: ((a.y - b.y) / distance) * NUCLEAR_COEFFICIENT,
     };
 }
 
