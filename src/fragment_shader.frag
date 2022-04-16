@@ -44,12 +44,7 @@ void main(void) {
 
     float intensity = 1.0 / (10.0 * distance(normalizedUv, cursorPosition));
 
-    float radius = sin(uTime / 10.0) * 0.5;
-    float distanceToCenter = distance(normalizedUv, cursorPosition);
-    float distanceToCircle = abs(distanceToCenter - radius);
-    float ringIntensity = 1.0 / (distanceToCircle * 100.0);
-
-    currentPointColor += vec4(1.0, 0.2, 0.2, 0.0) * intensity + ringIntensity * vec4(0.2, 0.2, 1.0, 0.0);
+    currentPointColor += vec4(1.0, 0.2, 0.2, 0.0) * intensity;
 
     for(int i = 0; i < 30; ++i) {
         vec2 pointPosition = vec2(
